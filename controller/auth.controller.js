@@ -5,10 +5,10 @@ const authController = {
 
     signUp: async (req, res) => {
         try {
-            const { username, email, password } = req.body;
+            const {email, password } = req.body;
 
             // Validate request data
-            if (!username || !email || !password) {
+            if (!email || !password) {
                 return res.status(400).json({ error: "All fields are required" });
             }
 
@@ -23,8 +23,8 @@ const authController = {
             const hash = await bcrypt.hash(password, 10);
 
             // Insert new user into the database
-            const sql = "INSERT INTO users (username, email, password) VALUES (?, ?, ?)";
-            const [result] = await pool.query(sql, [username, email, hash]);
+            const sql = "INSERT INTO users (email, password) VALUES (?, ?)";
+            const [result] = await pool.query(sql, [email, hash]);
 
             if (result.affectedRows > 0) {
                 return res.status(201).json({ message: "User registered successfully" });
