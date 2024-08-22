@@ -1,45 +1,43 @@
-const express = require('express')
-const bcrypt = require('bcrypt')
-const jwb = require('jsonwebtoken')
-const db = require('../lib/db')
+const pool = require("../lib/db");
+const bcrypt = require('bcrypt');
+
 const authController = {
-    singUp: async (req, res) => {
+
+    signUp: async (req, res) => {
         try {
-            const { username, email, password } = req.body
-            const [user,] = await pool.query("select * from users where email = ?", [email])
-            if (user[0]) return res.json({ error: "Email already exists!" })
+            const { username, email, password } = req.body;
 
+            // Validate request data
+            if (!username || !email || !password) {
+                return res.status(400).json({ error: "All fields are required" });
+            }
 
-            const hash = await bcrypt.hash(password, 10)
+            // Check if user already exists
+            const [users] = await pool.query("SELECT * FROM users WHERE email = ?", [email]);
 
-            const sql = "insert into users (username, email, password) values (?, ?, ?)"
-            const [rows, fields] = await pool.query(sql, [username, email, hash])
+            if (users.length > 0) {
+                return res.status(400).json({ error: "Email already exists!" });
+            }
 
-            if (rows.affectedRows) {
-                return res.json({ message: "Ok" })
+            // Hash the password
+            const hash = await bcrypt.hash(password, 10);
+
+            // Insert new user into the database
+            const sql = "INSERT INTO users (username, email, password) VALUES (?, ?, ?)";
+            const [result] = await pool.query(sql, [username, email, hash]);
+
+            if (result.affectedRows > 0) {
+                return res.status(201).json({ message: "User registered successfully" });
             } else {
-                return res.json({ error: "Error" })
+                return res.status(500).json({ error: "Failed to register user" });
             }
 
         } catch (error) {
-            console.log(error);
-            res.json({ error: error.message })
-        }
-    },
-    signIn: async (req, res) => {
-        try {
-            console.log('HELLO')
-        } catch (error) {
-
-        }
-    },
-    secretRoute: async (req, res) => {
-        try {
-            console.log('HELLO')
-        } catch (error) {
-
+            console.error("Error during registration:", error);
+            res.status(500).json({ error: error.message });
         }
     }
-}
 
-module.exports = authController
+};
+
+module.exports = authController;
