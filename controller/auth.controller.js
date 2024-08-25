@@ -1,6 +1,7 @@
 const pool = require("../lib/db");
 const bcrypt = require('bcrypt');
 const jwt = require("jsonwebtoken");
+const nodemailer = require('nodemailer');
 
 const authController = {
 
@@ -83,6 +84,70 @@ const authController = {
             })
         }
     },
+
+    // Reset password
+    resetPassword: async (req, res) => {
+        const JWT_SECRET = process.env.JWT_KEY;
+        const { email } = req.body;
+        try {
+            const [rows, fields] = await pool.query("SELECT * FROM users WHERE email = ?", [email]);
+            if (rows.length === 0) {
+                return res.status(404).json({ message: "Email not found" })
+            }
+
+            const token = jwt.sign({ id: rows[0].id }, JWT_SECRET, { expiresIn: '1h' });
+            const expiry = new Date();
+            expiry.setHours(expiry.getHours() + 1);
+            await pool.query('UPDATE users SET reset_token = ?, reset_token_expiry = ? WHERE email = ?', [token, expiry, email]);
+
+            // Send email
+            const transporter = nodemailer.createTransport({
+                service: 'Gmail',
+                auth: {
+                    user: 'your-email@gmail.com',
+                    pass: 'your-email-password'
+                }
+            });
+
+            const mailOptions = {
+                from: 'your-email@gmail.com',
+                to: email,
+                subject: 'Password Reset',
+                text: `You requested for a password reset. Click the link below to reset your password:\n\nhttp://localhost:3000/reset-password/${token}`
+            };
+
+            transporter.sendMail(mailOptions);
+
+            res.json({ message: 'Password reset link sent to your email' });
+
+        } catch (error) {
+            console.error('Server error:', error);
+            res.status(500).json({ message: 'Server error', error: error.message });
+        }
+    },
+
+    resetPasswordToken: async (req, res) => {
+        const { token } = req.params;
+        const { password } = req.body;
+
+        try {
+            const decoded = jwt.verify(token, JWT_SECRET);
+
+            const [rows] = await pool.query('SELECT * FROM users WHERE id = ? AND reset_token = ? AND reset_token_expiry > NOW()', [decoded.id, token]);
+
+            if (rows.length === 0) {
+                return res.status(400).json({ message: 'Invalid or expired token' });
+            }
+
+            const hashedPassword = await bcrypt.hash(password, 10);
+
+            await pool.query('UPDATE users SET password = ?, reset_token = NULL, reset_token_expiry = NULL WHERE id = ?', [hashedPassword, decoded.id]);
+
+            res.json({ message: 'Password has been reset' });
+        } catch (error) {
+            res.status(400).json({ message: 'Invalid or expired token' });
+        }
+    }
 
 };
 
