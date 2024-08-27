@@ -104,8 +104,8 @@ const authController = {
             const transporter = nodemailer.createTransport({
                 service: 'Gmail',
                 auth: {
-                    user: 'your-email@gmail.com',
-                    pass: 'your-email-password'
+                    user: 'cajiibxaaji02@gmail.com',
+                    pass: 'password'
                 }
             });
 
